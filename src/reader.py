@@ -74,5 +74,40 @@ class DataReader:
 
 class BatchProducer:
 
-    def __init__(self, batch_size: int, time_steps: int):
-        tf.train.range_input_producer()
+    def __init__(self, raw_data: List[int], batch_size: int, time_steps: int, name=None):
+        self.batch_size = batch_size
+        self.time_steps = time_steps
+        self.batch_shape = [batch_size, time_steps]
+
+        raw_data = tf.convert_to_tensor(raw_data, name='raw_data', dtype=tf.int32)
+        num_batches = tf.size(raw_data) // batch_size
+        self.data = tf.reshape(raw_data[:num_batches * batch_size], [batch_size, num_batches])
+
+        epoch_size = (num_batches - 1) // time_steps
+        assertion = tf.assert_positive(epoch_size, message='epoch_size == 0, which is not appropriate')
+        with tf.control_dependencies([assertion]):
+            self.epoch_size = tf.identity(epoch_size, name='epoch_size')
+
+        self.epoch_queue = tf.train.range_input_producer(epoch_size, shuffle=False)
+
+    def get_init_op(self):
+        return self.epoch_queue
+
+    def build_batch(self):
+        batch_index = self.epoch_queue.dequeue()
+
+        batch_index = tf.Print(batch_index, [batch_index])
+
+        x_batch = tf.strided_slice(
+            self.data,
+            [0, batch_index * self.time_steps],
+            [self.batch_size, (batch_index + 1) * self.time_steps])
+        x_batch.set_shape(self.batch_shape)
+
+        y_batch = tf.strided_slice(
+            self.data,
+            [0, batch_index * self.time_steps + 1],
+            [self.batch_size, (batch_index + 1) * self.time_steps + 1])
+        y_batch.set_shape(self.batch_shape)
+
+        return x_batch, y_batch

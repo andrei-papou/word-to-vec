@@ -1,8 +1,6 @@
-from threading import Thread
-
 import tensorflow as tf
 
-from reader import DataReader
+from reader import DataReader, BatchProducer
 
 
 def thread_func(coord: tf.train.Coordinator):
@@ -16,14 +14,15 @@ def thread_func(coord: tf.train.Coordinator):
 
 if __name__ == '__main__':
     data_reader = DataReader()
+    batch_producer = BatchProducer(raw_data=data_reader.train, batch_size=50, time_steps=10)
 
-    coord = tf.train.Coordinator()
-    threads = [Thread(target=thread_func, args=(coord,)) for _ in range(3)]
+    with tf.Session() as sess:
+        init = tf.global_variables_initializer()
+        sess.run(init)
+        tf.train.start_queue_runners()
 
-    for t in threads:
-        t.start()
-
-    coord.join(threads)
+        print(sess.run(batch_producer.build_batch()))
+        print(sess.run(batch_producer.build_batch()))
 
     # train_subset = data_reader.train[100:105]
     # valid_subset = data_reader.valid[100:105]
