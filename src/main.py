@@ -1,34 +1,24 @@
-import tensorflow as tf
+from common.reader import read_train_data, Vocab, read_evaluation_data
+from common.batcher import SimilarityBatcher, Window
+from common.evaluation import SimilarityEvaluator
 
-from reader import DataReader, BatchProducer
+from cbow.batcher import CBOWBatcher
+from cbow.model import CBOWModel
 
-
-def thread_func(coord: tf.train.Coordinator):
-    i = 1
-    while not coord.should_stop():
-        print(i)
-        i += 1
-        if i == 5:
-            break
+from skip_grams.batcher import SkipGramBatcher
+from skip_grams.model import SkipGramModel
 
 
 if __name__ == '__main__':
-    data_reader = DataReader()
-    batch_producer = BatchProducer(raw_data=data_reader.train, batch_size=50, time_steps=10)
+    vocab = Vocab.build('ptb.train.txt')
+    x1s, x2s, ys = read_evaluation_data('similarity1.csv', vocab=vocab)
+    ev_batcher = SimilarityBatcher(x1s=x1s, x2s=x2s, ys=ys, batch_size=10, vocab_size=vocab.size)
+    evaluator = SimilarityEvaluator(batcher=ev_batcher)
 
-    with tf.Session() as sess:
-        init = tf.global_variables_initializer()
-        sess.run(init)
-        tf.train.start_queue_runners()
-
-        print(sess.run(batch_producer.build_batch()))
-        print(sess.run(batch_producer.build_batch()))
-
-    # train_subset = data_reader.train[100:105]
-    # valid_subset = data_reader.valid[100:105]
-    # test_subset = data_reader.test[100:105]
-    #
-    # print(train_subset)
-    # print(valid_subset)
-    # print(test_subset)
-    # print(data_reader.vocab_size)
+    batcher = SkipGramBatcher(
+        data=read_train_data('ptb.train.txt', vocab=vocab),
+        window=Window.symmetric(3),
+        batch_size=50,
+        vocab_size=vocab.size)
+    model = SkipGramModel(batcher=batcher, evaluator=evaluator, embedding_dim=64)
+    model.train(epochs=100, learning_rate=0.05)

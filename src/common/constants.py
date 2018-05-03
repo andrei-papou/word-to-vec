@@ -15,3 +15,4 @@ TEST_FILE_NAME = 'ptb.test.txt'
 VALID_FILE_NAME = 'ptb.valid.txt'
 
 EOS = '<eos>'
+UNK = '<unk>'
